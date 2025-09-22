@@ -4,14 +4,17 @@ import mido
 import io
 import random
 
+# Initialize Flask app and enable CORS for cross-origin requests
 app = Flask(__name__)
 CORS(app)
 
+# Mapping from key names to MIDI note numbers (C4 = 60)
 KEY_TO_MIDI = {
     'C': 60, 'C#': 61, 'D': 62, 'D#': 63, 'E': 64, 'F': 65,
     'F#': 66, 'G': 67, 'G#': 68, 'A': 69, 'A#': 70, 'B': 71
 }
 
+# Dictionary of scale names to their interval patterns (in semitones)
 SCALE_INTERVALS = {
     'Major': [2, 2, 1, 2, 2, 2, 1],
     'Natural Minor': [2, 1, 2, 2, 1, 2, 2],
@@ -51,16 +54,17 @@ def generate_midi():
     note_length = int(data.get('noteLength', 480))
     velocity = int(data.get('velocity', 80))
     randomize = bool(data.get('randomize', False))
+    randomize_velocity = bool(data.get('randomizeVelocity', False))
+    randomize_note_length = bool(data.get('randomizeNoteLength', False))
+    sequence_type = data.get('sequenceType', 'arpeggio')
     root_note = KEY_TO_MIDI.get(key, 60)
     intervals = SCALE_INTERVALS.get(scale, SCALE_INTERVALS['Major'])
 
-    # Build scale notes for arpeggio (root + scale degrees)
     notes = [root_note]
     current = root_note
     for interval in intervals:
         current += interval
         notes.append(current)
-    arpeggio_notes = notes[:4]
 
     mid = mido.MidiFile(ticks_per_beat=480)
     track = mido.MidiTrack()
@@ -68,9 +72,20 @@ def generate_midi():
     track.append(mido.Message('program_change', program=0, time=0))
 
     for bar in range(bars):
-        for note in arpeggio_notes:
-            n_length = random.randint(60, 1920) if randomize else note_length
-            n_velocity = random.randint(10, 127) if randomize else velocity
+        if sequence_type == 'arpeggio':
+            seq_notes = notes[:4]
+        elif sequence_type == 'scale':
+            seq_notes = notes
+        elif sequence_type == 'random':
+            seq_notes = [random.choice(notes) for _ in range(4)]
+        elif sequence_type == 'none':
+            seq_notes = [root_note]
+        else:
+            seq_notes = notes[:4]
+
+        for note in seq_notes:
+            n_length = random.randint(60, 1920) if (randomize or randomize_note_length) else note_length
+            n_velocity = random.randint(10, 127) if (randomize or randomize_velocity) else velocity
             track.append(mido.Message('note_on', note=note, velocity=n_velocity, time=0))
             track.append(mido.Message('note_off', note=note, velocity=n_velocity, time=n_length))
 
@@ -85,4 +100,9 @@ def generate_midi():
     )
 
 if __name__ == '__main__':
+    # Run the Flask app on port 6000 in debug mode
     app.run(debug=True, host='0.0.0.0', port=6000)
+
+# --- React Frontend Snippet ---
+
+# (React frontend code removed from Python file. Place this code in your frontend project instead.)
